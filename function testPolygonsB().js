@@ -35,13 +35,16 @@ function testPolygonsB()
 				continue;
 			}
 
-			// get pts from verts
+			// get local points from verts
 			var pts = normaliseVertices(verts);
 			
+			// transform to world points
+			var worldPts = affineTransform(pts);
+
 			// print
-			for (var j = 0; j < pts.length; j++)
+			for (var j = 0; j < worldPts.length; j++)
 			{
-				console.println("( " + pts[j].x + ", " + pts[j].y + " )");
+				console.println("( " + worldPts[j].x + ", " + worldPts[j].y + " )");
 			}
 
 			

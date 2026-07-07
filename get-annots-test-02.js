@@ -20,7 +20,6 @@ function testPolygonsB()
 		var a = annots[i];
 
 		console.println("Type: " + a.type);
-		
 
 		if (a.type === "Polygon" || a.type === "PolyLine")
 		{
@@ -29,28 +28,51 @@ function testPolygonsB()
 
 			var verts = a.vertices;
 
-			if (!verts || verts.length === 0)
+		
+			if (!verts)
 			{
-				console.println("Invalid vertices");
+				console.println("No vertices!");
 				continue;
 			}
-		
-			// get pts from verts
+
+			// get local points from verts
 			var pts = normaliseVertices(verts);
 			
+			// transform to world points
+			var worldPts = affineTransform(pts);
+
 			// print
-			for (var j = 0; j < pts.length; j++)
+			for (var j = 0; j < worldPts.length; j++)
 			{
-				console.println("( " + pts[j].x + ", " + pts[j].y + " )");
+				console.println("( " + worldPts[j].x + ", " + worldPts[j].y + " )");
 			}
 
 			
 		}
 
 	}
-	
-	return "OK";
 
+}
+
+function affineTransform(pts) {
+
+    var out = [];
+
+    // Identity transform (1:1)
+    // X = x
+    // Y = y
+
+    for (var i = 0; i < pts.length; i++) {
+
+        var p = pts[i];
+
+        out.push({
+            x: p.x,
+            y: p.y
+        });
+    }
+
+    return out;
 }
 
 function normaliseVertices(verts) {
