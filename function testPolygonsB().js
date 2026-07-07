@@ -17,7 +17,7 @@ function testPolygonsB()
 		if (!annots) 
 		{
 			console.println("No annotations found.");
-			return;
+			continue;
 		}
 
 		console.println("Found " + annots.length + " annotations");
@@ -50,7 +50,10 @@ function testPolygonsB()
 				var worldPts = affineTransform(pts);
 
 				// add page id to world points set
-				
+				for (var j = 0; j < worldPts.length; j++)
+				{
+					worldPts[j].page = p;
+				}
 
 				// print
 				for (var j = 0; j < worldPts.length; j++)

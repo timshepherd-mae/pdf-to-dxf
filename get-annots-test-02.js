@@ -17,7 +17,7 @@ function testPolygonsB()
 		if (!annots) 
 		{
 			console.println("No annotations found.");
-			return;
+			continue;
 		}
 
 		console.println("Found " + annots.length + " annotations");
@@ -59,6 +59,7 @@ function testPolygonsB()
 				for (var j = 0; j < worldPts.length; j++)
 				{
 					console.println("( " + worldPts[j].x + ", " + worldPts[j].y + " ) -- page: " + worldPts[j].page);
+
 				}
 
 				
