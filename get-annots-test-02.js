@@ -1,8 +1,26 @@
-function testPolygonsB()
+function testPolygons()
 {
 
 	console.clear();
-	console.println("Running testPolygonsB...");
+	console.println("Running testPolygons...");
+
+	var cPts = getControlLinePoints.call(this);
+	var wPts = getControlWorldPoints.call(this);
+	if (!cPts || !wPts)
+	{
+		console.println("Missing control data");
+		return;
+	}	
+
+	var T = solveAffineTransform(cPts, wPts);
+	if (!T)
+	{
+		console.println("Failed to solve affine transform");
+		return;
+	}
+
+	console.println("Transform computed:");
+	console.println(JSON.stringify(T));
 
 	var totalPages = this.numPages;
 	console.println("Total pages: " + totalPages);
@@ -47,7 +65,7 @@ function testPolygonsB()
 				var pts = normaliseVertices(verts);
 				
 				// transform to world points
-				var worldPts = affineTransform(pts);
+				var worldPts = affineTransform(pts, T);
 
 				// add page id to world points set
 				for (var j = 0; j < worldPts.length; j++)
@@ -71,29 +89,6 @@ function testPolygonsB()
 
 }
 
-
-
-function affineTransform(pts) {
-
-    var out = [];
-
-    // Identity transform (1:1)
-    // X = x
-    // Y = y
-
-    for (var i = 0; i < pts.length; i++) {
-
-        var p = pts[i];
-
-        out.push({
-            x: p.x,
-            y: p.y
-        });
-    }
-
-    return out;
-}
-
 function normaliseVertices(verts) {
 
     var pts = [];
@@ -111,5 +106,131 @@ function normaliseVertices(verts) {
     return pts;
 }
 
+function getControlLinePoints() {
 
-testPolygonsB()
+    var totalPages = this.numPages;
+
+    for (var p = 0; p < totalPages; p++) {
+
+        var annots = this.getAnnots({ nPage: p });
+        if (!annots) continue;
+
+        for (var i = 0; i < annots.length; i++) {
+
+            var a = annots[i];
+
+            if (a.subject !== "CONTROL") continue;
+            if (a.type !== "PolyLine") continue;
+
+            var pts = normaliseVertices(a.vertices);
+
+            if (pts.length !== 3) {
+                console.println("Control line must have exactly 3 points");
+                return null;
+            }
+
+            return pts; // [p0, p1, p2]
+        }
+    }
+
+    console.println("No control line found");
+    return null;
+}
+
+function getControlWorldPoints() {
+
+    function getVal(name) {
+        var f = this.getField(name);
+        if (!f) return null;
+        return parseFloat(f.value);
+    }
+
+    return [
+        { x: getVal.call(this, "world_ax"), y: getVal.call(this, "world_ay") },
+        { x: getVal.call(this, "world_bx"), y: getVal.call(this, "world_by") },
+        { x: getVal.call(this, "world_cx"), y: getVal.call(this, "world_cy") }
+    ];
+}
+
+function solveAffineTransform(pPts, wPts) {
+
+    if (pPts.length !== 3 || wPts.length !== 3) {
+        console.println("Need exactly 3 control points");
+        return null;
+    }
+
+    var p1 = pPts[0], p2 = pPts[1], p3 = pPts[2];
+    var q1 = wPts[0], q2 = wPts[1], q3 = wPts[2];
+
+    // determinant
+    var det =
+        p1.x * (p2.y - p3.y) +
+        p2.x * (p3.y - p1.y) +
+        p3.x * (p1.y - p2.y);
+
+    if (Math.abs(det) < 0.000001) {
+        console.println("Control points are collinear or invalid");
+        return null;
+    }
+
+    var T = {};
+
+    // Solve for X transform
+    T.a = (
+        q1.x * (p2.y - p3.y) +
+        q2.x * (p3.y - p1.y) +
+        q3.x * (p1.y - p2.y)
+    ) / det;
+
+    T.b = (
+        q1.x * (p3.x - p2.x) +
+        q2.x * (p1.x - p3.x) +
+        q3.x * (p2.x - p1.x)
+    ) / det;
+
+    T.c = (
+        q1.x * (p2.x * p3.y - p3.x * p2.y) +
+        q2.x * (p3.x * p1.y - p1.x * p3.y) +
+        q3.x * (p1.x * p2.y - p2.x * p1.y)
+    ) / det;
+
+    // Solve for Y transform
+    T.d = (
+        q1.y * (p2.y - p3.y) +
+        q2.y * (p3.y - p1.y) +
+        q3.y * (p1.y - p2.y)
+    ) / det;
+
+    T.e = (
+        q1.y * (p3.x - p2.x) +
+        q2.y * (p1.x - p3.x) +
+        q3.y * (p2.x - p1.x)
+    ) / det;
+
+    T.f = (
+        q1.y * (p2.x * p3.y - p3.x * p2.y) +
+        q2.y * (p3.x * p1.y - p1.x * p3.y) +
+        q3.y * (p1.x * p2.y - p2.x * p1.y)
+    ) / det;
+
+    return T;
+}
+
+function affineTransform(pts, T) {
+
+    var out = [];
+
+    for (var i = 0; i < pts.length; i++) {
+
+        var p = pts[i];
+
+        out.push({
+            x: T.a * p.x + T.b * p.y + T.c,
+            y: T.d * p.x + T.e * p.y + T.f
+        });
+    }
+
+    return out;
+}
+
+testPolygons();

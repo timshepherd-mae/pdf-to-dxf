@@ -4,61 +4,88 @@ function testPolygons()
 	console.clear();
 	console.println("Running testPolygons...");
 
-	var annots = this.getAnnots({ nPage: this.pageNum });
-
-	if (!annots) 
+	var cPts = getControlLinePoints.call(this);
+	var wPts = getControlWorldPoints.call(this);
+	if (!cPts || !wPts)
 	{
-		console.println("No annotations found.");
+		console.println("Missing control data");
+		return;
+	}	
+
+	var T = solveAffineTransform(cPts, wPts);
+	if (!T)
+	{
+		console.println("Failed to solve affine transform");
 		return;
 	}
 
-	console.println("Found " + annots.length + " annotations");
+	console.println("Transform computed:");
+	console.println(JSON.stringify(T));
 
-	for (var i = 0; i < annots.length; i++) 
+	var totalPages = this.numPages;
+	console.println("Total pages: " + totalPages);
+
+	for (var p = 0; p < totalPages; p++)
 	{
+		console.println("=== Page " + p + " ===");
 
-		var a = annots[i];
 
-		console.println("Type: " + a.type);
+		var annots = this.getAnnots({ nPage: p });
 
-		if (a.type === "Polygon" || a.type === "PolyLine")
+		if (!annots) 
+		{
+			console.println("No annotations found.");
+			continue;
+		}
+
+		console.println("Found " + annots.length + " annotations");
+
+		for (var i = 0; i < annots.length; i++) 
 		{
 
-			console.println("---- " + a.type + " Found ----");
+			var a = annots[i];
 
-			var verts = a.vertices;
+			console.println("Type: " + a.type);
 
-		
-			if (!verts)
+			if (a.type === "Polygon" || a.type === "PolyLine")
 			{
-				console.println("No vertices!");
-				continue;
-			}
 
-			// Case 1: flat array
-			if (typeof verts[0] === "number")
-			{
-	
-				for (var j = 0; j < verts.length; j += 2)
+				console.println("---- " + a.type + " Found ----");
+
+				var verts = a.vertices;
+
+			
+				if (!verts)
 				{
-					console.println("(" + verts[j] + ", " + verts[j + 1] + ")");
+					console.println("No vertices!");
+					continue;
 				}
-	
-			}
-			// Case 2: array of [x,y]
-			else
-			{
 
-				for (var j = 0; j < verts.length; j++)
+				// get local points from verts
+				var pts = normaliseVertices(verts);
+				
+				// transform to world points
+				var worldPts = affineTransform(pts, T);
+
+				// add page id to world points set
+				for (var j = 0; j < worldPts.length; j++)
 				{
-					console.println("(" + verts[j][0] + ", " + verts[j][1] + ")");
+					worldPts[j].page = p;
 				}
+
+				// print
+				for (var j = 0; j < worldPts.length; j++)
+				{
+					console.println("( " + worldPts[j].x + ", " + worldPts[j].y + " ) -- page: " + worldPts[j].page);
+
+				}
+
+				
 			}
+
 		}
 
 	}
 
 }
 
-
-testPolygons()
