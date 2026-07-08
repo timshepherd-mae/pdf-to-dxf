@@ -1,3 +1,5 @@
+//get-annots-test-02.js
+
 function testPolygons()
 {
 
