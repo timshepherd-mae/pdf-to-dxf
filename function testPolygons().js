@@ -45,6 +45,28 @@ function testPolygons()
 
 			var a = annots[i];
 
+			if (a.subject === "CONTROL") continue;
+
+			// parse z values
+			var zData = parseZValues(a.subject, this);
+			if (!zData.valid)
+			{
+				console.println("Invalid z values for annotation " + i + ": " + a.subject);
+				continue;
+			}
+
+			var zBase = zData.zBase;
+			var zHeight = zData.zHeight;
+
+			console.println("zBase: " + zBase + ", zHeight: " + zHeight);
+
+
+			// get fill colour value
+			var strokeColor = a.strokeColor;
+
+			console.println("colour: " + strokeColor );
+
+
 			console.println("Type: " + a.type);
 
 			if (a.type === "Polygon" || a.type === "PolyLine")
