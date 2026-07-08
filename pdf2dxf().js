@@ -1,5 +1,7 @@
-function testPolygons()
+function pdf2dxf()
 {
+
+	var allShapes = [];
 
 	console.clear();
 	console.println("Running testPolygons...");
@@ -57,6 +59,7 @@ function testPolygons()
 
 			var zBase = zData.zBase;
 			var zHeight = zData.zHeight;
+			var isFlat = zData.isFlat;
 
 			console.println("zBase: " + zBase + ", zHeight: " + zHeight);
 
@@ -69,7 +72,7 @@ function testPolygons()
 
 			console.println("Type: " + a.type);
 
-			if (a.type === "Polygon" || a.type === "PolyLine")
+			if (a.type === "Polygon")
 			{
 
 				console.println("---- " + a.type + " Found ----");
@@ -95,6 +98,19 @@ function testPolygons()
 					worldPts[j].page = p;
 				}
 
+                var shape = 
+                {
+                    type: a.type,
+                    pts: worldPts,
+                    zBase: zBase,
+                    zHeight: zHeight,
+                    isFlat: isFlat,
+                    colour: strokeColor,
+                    page: p
+                }
+
+                allShapes.push(shape);
+                
 				// print
 				for (var j = 0; j < worldPts.length; j++)
 				{
