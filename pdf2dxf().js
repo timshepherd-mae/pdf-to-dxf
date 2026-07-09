@@ -1,4 +1,4 @@
-function testPolygons()
+function pdf2dxf()
 {
 
 	console.clear();
