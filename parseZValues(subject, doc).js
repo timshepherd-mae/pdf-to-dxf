@@ -60,6 +60,7 @@ function parseZValues(subject, doc) {
     return {
         zBase: zBase,
         zHeight: zHeight,
-        valid: true
+        valid: true,
+        isFlat: (zHeight === 0)
     };
 }
