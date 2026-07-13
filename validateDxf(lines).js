@@ -3,22 +3,23 @@ function validateDxf(lines) {
     var errors = [];
     var handles = {};
 
-    // --- HANDLE CHECK ---
-    for (var i = 0; i < lines.length; i++) {
+    // --- HANDLE CHECK (PAIR SAFE) ---
+    for (var i = 0; i < lines.length; i += 2) {
 
-        if (lines[i].trim() === "5") {
+        var code = (lines[i] || "").trim();
+        var value = (lines[i + 1] || "").trim();
+        
+        if (code === "5") {
 
-            var h = (lines[i + 1] || "").trim();
-
-            if (h === "0") {
-                errors.push("INVALID HANDLE 0 at line " + (i + 1));
+            if (value === "0") {
+                errors.push("INVALID HANDLE 0 at line " + (i + 2));
             }
 
-            if (handles[h]) {
-                errors.push("DUPLICATE HANDLE " + h + " at line " + (i + 1));
+            if (handles[value]) {
+                errors.push("DUPLICATE HANDLE " + value + " at line " + (i + 2));
             }
 
-            handles[h] = true;
+            handles[value] = true;
         }
     }
 
@@ -60,7 +61,7 @@ function validateDxf(lines) {
             lines[i].trim() === "BLOCK_RECORD" &&
             (lines[i - 2] || "").trim() === "TABLE"
         ) {
-            var declared = parseInt(lines[i + 1]);
+            var declared = parseInt((lines[i + 2] || "").trim(), 10);;
 
             if (declared !== blockRecordCount) {
                 errors.push(
@@ -75,3 +76,4 @@ function validateDxf(lines) {
 
     return errors;
 }
+

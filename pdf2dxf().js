@@ -125,5 +125,53 @@ function pdf2dxf()
 
 	}
 
+	var dxfString = buildDxfString(allShapes);
+
+	/*
+	var errors = validateDxf(dxfString.split(/\r\n/));
+ 	if (errors.length > 0) 
+	{ 
+		console.println("DXF VALIDATION FAILED:"); 
+		errors.forEach(function(e) { console.println(e); });
+	} 
+	else 
+	{ 
+		console.println("DXF VALID ✅"); 
+	}
+		*/
+	try 
+	{ 
+		if (this.createDataObject)
+		{
+			this.createDataObject(
+				{ 
+					cName: "model.dxf", 
+					cValue: dxfString 
+				}
+			); 
+		}
+		else if (this.addDataObject)
+		{
+			this.addDataObject(
+				{ 
+					cName: "model.dxf",
+					cValue: dxfString 
+				}
+			); 
+		}
+		else
+		{
+			throw "No attachment API available";
+		}
+
+		console.println("DXF attached: model.dxf");
+	} 
+	catch (e) 
+	{ 
+		console.println("DXF attach failed: " + e); 
+	}
+
+	return dxfString;
+
 }
 

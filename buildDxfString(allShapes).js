@@ -1,4 +1,7 @@
 function buildDxfString(allShapes) {
+    // Simplified AutoCAD R12-style DXF writer.
+    // Current scope: side-wall 3DFACEs only.
+    // Deferred: top and bottom triangulation by ear-cutting.
 
     var lines = [];
 
@@ -8,200 +11,145 @@ function buildDxfString(allShapes) {
         }
     }
 
-    // =========================
-    // HANDLE SYSTEM
-    // =========================
-    var handleCounter = 256;
-
-    function nextHandle() {
-        var h = (handleCounter++).toString(16).toUpperCase();
-        if (h === "0") {
-            throw "INVALID HANDLE GENERATED";
+    function fmt(n) {
+        if (typeof n !== "number") {
+            n = parseFloat(n);
         }
-        return h;
-    }
-    
-    console.println("FIRST HANDLE: " + nextHandle());
+        if (isNaN(n)) {
+            n = 0;
+        }
 
-    // =========================
-    // HEADER
-    // =========================
-    add("0","SECTION");
-    add("2","HEADER");
-
-    add("9","$ACADVER");
-    add("1","AC1015");
-
-    add("9","$HANDSEED");
-    add("5", handleCounter.toString(16).toUpperCase());
-
-    add("0","ENDSEC");
-
-    // =========================
-    // TABLES (BLOCK_RECORD)
-    // =========================
-    add("0","SECTION");
-    add("2","TABLES");
-
-    add("0","TABLE");
-    add("2","APPID");
-    add("70","0");     // zero entries
-    add("0","ENDTAB");
-
-    add("0","TABLE");
-    add("2","BLOCK_RECORD");
-    add("70", allShapes.length);     // number of entries
-
-    for (var i = 0; i < allShapes.length; i++) {
-
-        add("0","BLOCK_RECORD");
-        add("5", nextHandle());
-        add("100","AcDbSymbolTableRecord");
-        add("100","AcDbBlockTableRecord");
-        add("2","BLOCK_" + i);
+        // Keep output readable, but avoid exponential notation for normal drawing coordinates.
+        return String(Math.round(n * 1000000) / 1000000);
     }
 
-    add("0","ENDTAB");
-    add("0","ENDSEC");
+    function blockName(index) {
+        // BLOCK-01, BLOCK-02, ... to match the style of minimum_3F.dxf.txt.
+        var n = index + 1;
+        return "BLOCK-" + (n < 10 ? "0" + n : String(n));
+    }
 
-    // =========================
-    // BLOCKS (geometry)
-    // =========================
-    add("0","SECTION");
-    add("2","BLOCKS");
+    function polygonSignedArea(pts) {
+        var area = 0;
 
-    for (var i = 0; i < allShapes.length; i++) {
+        for (var i = 0; i < pts.length; i++) {
+            var p1 = pts[i];
+            var p2 = pts[(i + 1) % pts.length];
 
-        var shape = allShapes[i];
+            area += (p1.x * p2.y) - (p2.x * p1.y);
+        }
+
+        return area / 2;
+    }
+
+    function add3dFace(p1, p2, p3, p4, layerName) {
+        add("0",  "3DFACE");
+        add("8",  layerName || "LAYER");
+
+        add("10", fmt(p1.x)); add("20", fmt(p1.y)); add("30", fmt(p1.z));
+        add("11", fmt(p2.x)); add("21", fmt(p2.y)); add("31", fmt(p2.z));
+        add("12", fmt(p3.x)); add("22", fmt(p3.y)); add("32", fmt(p3.z));
+        add("13", fmt(p4.x)); add("23", fmt(p4.y)); add("33", fmt(p4.z));
+    }
+
+    function addSideWallsForShape(shape) {
         var pts = shape.pts;
 
-        if (!pts || pts.length < 3) continue;
-
-        var zBase = shape.zBase;
-        var zTop = shape.zBase + shape.zHeight;
-        var isFlat = (shape.zHeight === 0);
-
-        // ---- BLOCK START ----
-        add("0","BLOCK");
-        add("5", nextHandle());
-        add("100","AcDbEntity");
-        add("100","AcDbBlockBegin");
-        add("2","BLOCK_" + i);
-        add("70","0");
-
-        var p0 = pts[0];
-
-        // =========================
-        // FLAT
-        // =========================
-        if (isFlat) {
-
-            for (var j = 1; j < pts.length - 1; j++) {
-
-                var p1 = pts[j];
-                var p2 = pts[j + 1];
-
-                add("0","3DFACE");
-                add("5", nextHandle());
-                add("100","AcDbEntity");
-                add("100","AcDbFace");
-                add("8","0");
-
-                add("10", p0.x); add("20", p0.y); add("30", zBase);
-                add("11", p1.x); add("21", p1.y); add("31", zBase);
-                add("12", p2.x); add("22", p2.y); add("32", zBase);
-                add("13", p2.x); add("23", p2.y); add("33", zBase);
-            }
+        if (!pts || pts.length < 3) {
+            return;
         }
 
-        // =========================
-        // EXTRUDED
-        // =========================
-        else {
+        var zMin = parseFloat(shape.zBase);
+        var zMax = parseFloat(shape.zBase) + parseFloat(shape.zHeight);
 
-            // ---- TOP ----
-            for (var j = 1; j < pts.length - 1; j++) {
+        if (isNaN(zMin)) zMin = 0;
+        if (isNaN(zMax)) zMax = zMin;
 
-                var p1 = pts[j];
-                var p2 = pts[j + 1];
-
-                add("0","3DFACE");
-                add("5", nextHandle());
-                add("100","AcDbEntity");
-                add("100","AcDbFace");
-                add("8","0");
-
-                add("10", p0.x); add("20", p0.y); add("30", zTop);
-                add("11", p1.x); add("21", p1.y); add("31", zTop);
-                add("12", p2.x); add("22", p2.y); add("32", zTop);
-                add("13", p2.x); add("23", p2.y); add("33", zTop);
-            }
-
-            // ---- BOTTOM (reversed) ----
-            for (var j = 1; j < pts.length - 1; j++) {
-
-                var p1 = pts[j];
-                var p2 = pts[j + 1];
-
-                add("0","3DFACE");
-                add("5", nextHandle());
-                add("100","AcDbEntity");
-                add("100","AcDbFace");
-                add("8","0");
-
-                add("10", p0.x); add("20", p0.y); add("30", zBase);
-                add("11", p2.x); add("21", p2.y); add("31", zBase);
-                add("12", p1.x); add("22", p1.y); add("32", zBase);
-                add("13", p1.x); add("23", p1.y); add("33", zBase);
-            }
-
-            // ---- SIDES ----
-            for (var j = 0; j < pts.length; j++) {
-
-                var p1 = pts[j];
-                var p2 = pts[(j + 1) % pts.length];
-
-                add("0","3DFACE");
-                add("5", nextHandle());
-                add("100","AcDbEntity");
-                add("100","AcDbFace");
-                add("8","0");
-
-                add("10", p1.x); add("20", p1.y); add("30", zBase);
-                add("11", p2.x); add("21", p2.y); add("31", zBase);
-                add("12", p2.x); add("22", p2.y); add("32", zTop);
-                add("13", p1.x); add("23", p1.y); add("33", zTop);
-            }
+        // No side wall is possible for a flat shape.
+        if (zMin === zMax) {
+            return;
         }
 
-        // ---- BLOCK END ----
-        add("0","ENDBLK");
-        add("5", nextHandle());
-        add("100","AcDbEntity");
-        add("100","AcDbBlockEnd");
+        // If the source polygon is counter-clockwise, the outward side-wall normal is obtained
+        // by writing each wall as: bottom-current, bottom-next, top-next, top-current.
+        //
+        // If clockwise, reverse the vertical ordering to keep the normal pointing outwards.
+        var isCcw = polygonSignedArea(pts) > 0;
+
+        for (var i = 0; i < pts.length; i++) {
+            var a = pts[i];
+            var b = pts[(i + 1) % pts.length];
+
+            var aLow  = { x: a.x, y: a.y, z: zMin };
+            var bLow  = { x: b.x, y: b.y, z: zMin };
+            var bHigh = { x: b.x, y: b.y, z: zMax };
+            var aHigh = { x: a.x, y: a.y, z: zMax };
+
+            if (isCcw) {
+                add3dFace(aLow, bLow, bHigh, aHigh, "LAYER");
+            } else {
+                add3dFace(aLow, aHigh, bHigh, bLow, "LAYER");
+            }
+        }
     }
 
-    add("0","ENDSEC");
+    // =========================
+    // HEADER - intentionally minimal R12-style structure
+    // =========================
+    add("0", "SECTION");
+    add("2", "HEADER");
+    add("0", "ENDSEC");
 
     // =========================
-    // ENTITIES (INSERTS)
+    // BLOCKS - one block per valid polygon shape
     // =========================
-    add("0","SECTION");
-    add("2","ENTITIES");
+    add("0", "SECTION");
+    add("2", "BLOCKS");
+
+    var emittedBlocks = [];
 
     for (var i = 0; i < allShapes.length; i++) {
+        var shape = allShapes[i];
 
-        add("0","INSERT");
-        add("5", nextHandle());
-        add("100","AcDbEntity");
-        add("100","AcDbBlockReference");
+        if (!shape || shape.type !== "Polygon" || !shape.pts || shape.pts.length < 3) {
+            continue;
+        }
 
-        add("2","BLOCK_" + i);
-        add("10","0"); add("20","0"); add("30","0");
+        var name = blockName(emittedBlocks.length);
+        emittedBlocks.push(name);
+
+        add("0",  "BLOCK");
+        add("8",  "0");
+        add("2",  name);
+        add("70", "0");
+        add("10", "0.0");
+        add("20", "0.0");
+        add("30", "0.0");
+
+        addSideWallsForShape(shape);
+
+        add("0", "ENDBLK");
     }
 
-    add("0","ENDSEC");
-    add("0","EOF");
+    add("0", "ENDSEC");
 
-    return lines.join("\r\n");
+    // =========================
+    // ENTITIES - insert each emitted block at origin
+    // =========================
+    add("0", "SECTION");
+    add("2", "ENTITIES");
+
+    for (var j = 0; j < emittedBlocks.length; j++) {
+        add("0",  "INSERT");
+        add("8",  "LAYER");
+        add("2",  emittedBlocks[j]);
+        add("10", "0.0");
+        add("20", "0.0");
+        add("30", "0.0");
+    }
+
+    add("0", "ENDSEC");
+    add("0", "EOF");
+
+    return lines.join("\n");
 }
