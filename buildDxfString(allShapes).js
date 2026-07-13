@@ -52,6 +52,126 @@ function buildDxfString(allShapes) {
         add("13", fmt(p4.x)); add("23", fmt(p4.y)); add("33", fmt(p4.z));
     }
 
+    function triangulatePolygonEarClipping(pts) {
+        var triangles = [];
+
+        if (!pts || pts.length < 3) {
+            return triangles;
+        }
+
+        var indices = [];
+
+        for (var i = 0; i < pts.length; i++) {
+            indices.push(i);
+        }
+
+        // Ear clipping is simpler if the working polygon is CCW.
+        // If the source polygon is clockwise, reverse the index list.
+        if (polygonSignedArea(pts) < 0) {
+            indices.reverse();
+        }
+
+        var guard = 0;
+        var maxGuard = pts.length * pts.length;
+
+        while (indices.length > 3 && guard < maxGuard) {
+            var earFound = false;
+
+            for (var i = 0; i < indices.length; i++) {
+                var prevIndex = indices[(i - 1 + indices.length) % indices.length];
+                var currIndex = indices[i];
+                var nextIndex = indices[(i + 1) % indices.length];
+
+                var prev = pts[prevIndex];
+                var curr = pts[currIndex];
+                var next = pts[nextIndex];
+
+                if (!isConvexEarVertex(prev, curr, next)) {
+                    continue;
+                }
+
+                if (containsAnyOtherPointInTriangle(pts, indices, prevIndex, currIndex, nextIndex)) {
+                    continue;
+                }
+
+                triangles.push([prevIndex, currIndex, nextIndex]);
+
+                indices.splice(i, 1);
+                earFound = true;
+                break;
+            }
+
+            if (!earFound) {
+                console.println("Ear clipping failed: no valid ear found.");
+                console.println("Polygon may be self-intersecting, duplicated, collinear, or otherwise invalid.");
+                break;
+            }
+
+            guard++;
+        }
+
+        if (indices.length === 3) {
+            triangles.push([indices[0], indices[1], indices[2]]);
+        }
+
+        if (guard >= maxGuard) {
+            console.println("Ear clipping stopped by guard limit.");
+        }
+
+        return triangles;
+    }
+
+    function isConvexEarVertex(a, b, c) {
+        var cross =
+            ((b.x - a.x) * (c.y - a.y)) -
+            ((b.y - a.y) * (c.x - a.x));
+
+        // For the working polygon, which we force to CCW,
+        // a convex vertex has positive cross product.
+        return cross > 0.000000001;
+    }
+
+    function containsAnyOtherPointInTriangle(pts, indices, ia, ib, ic) {
+        var a = pts[ia];
+        var b = pts[ib];
+        var c = pts[ic];
+
+        for (var i = 0; i < indices.length; i++) {
+            var idx = indices[i];
+
+            if (idx === ia || idx === ib || idx === ic) {
+                continue;
+            }
+
+            var p = pts[idx];
+
+            if (pointInTriangle2d(p, a, b, c)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function pointInTriangle2d(p, a, b, c) {
+        var eps = 0.000000001;
+
+        var c1 = cross2d(a, b, p);
+        var c2 = cross2d(b, c, p);
+        var c3 = cross2d(c, a, p);
+
+        // Because the triangle is CCW, a point is inside if it is
+        // on the left side of all three directed edges.
+        return c1 >= -eps && c2 >= -eps && c3 >= -eps;
+    }
+
+    function cross2d(a, b, c) {
+        return ((b.x - a.x) * (c.y - a.y)) -
+            ((b.y - a.y) * (c.x - a.x));
+    }
+
+
+
     function addSideWallsForShape(shape) {
         var pts = shape.pts;
 
@@ -86,12 +206,68 @@ function buildDxfString(allShapes) {
             var aHigh = { x: a.x, y: a.y, z: zMax };
 
             if (isCcw) {
-                add3dFace(aLow, bLow, bHigh, aHigh, "LAYER");
+                add3dFace(aLow, bLow, bHigh, aHigh, "0");
             } else {
-                add3dFace(aLow, aHigh, bHigh, bLow, "LAYER");
+                add3dFace(aLow, aHigh, bHigh, bLow, "0");
             }
         }
     }
+
+    function addEarClippedCapsForShape(shape) {
+        var pts = shape.pts;
+
+        if (!pts || pts.length < 3) {
+            return;
+        }
+
+        var zMin = parseFloat(shape.zBase);
+        var zMax = parseFloat(shape.zBase) + parseFloat(shape.zHeight);
+
+        if (isNaN(zMin)) zMin = 0;
+        if (isNaN(zMax)) zMax = zMin;
+
+        // If flat, there is no enclosed solid yet.
+        // We can handle flat single-surface polygons later if needed.
+        if (zMin === zMax) {
+            return;
+        }
+
+        var triangles = triangulatePolygonEarClipping(pts);
+
+        for (var i = 0; i < triangles.length; i++) {
+            var tri = triangles[i];
+
+            var a = pts[tri[0]];
+            var b = pts[tri[1]];
+            var c = pts[tri[2]];
+
+            // =========================
+            // TOP CAP
+            // =========================
+            // The ear-clipping helper returns CCW triangles in XY.
+            // At zMax, CCW order gives an upward normal.
+            add3dFace(
+                { x: a.x, y: a.y, z: zMax },
+                { x: b.x, y: b.y, z: zMax },
+                { x: c.x, y: c.y, z: zMax },
+                { x: c.x, y: c.y, z: zMax },
+                "0"
+            );
+
+            // =========================
+            // BOTTOM CAP
+            // =========================
+            // Reverse the triangle order so the normal points downwards.
+            add3dFace(
+                { x: a.x, y: a.y, z: zMin },
+                { x: c.x, y: c.y, z: zMin },
+                { x: b.x, y: b.y, z: zMin },
+                { x: b.x, y: b.y, z: zMin },
+                "0"
+            );
+        }
+    }
+
 
     // =========================
     // HEADER - intentionally minimal R12-style structure
@@ -116,7 +292,13 @@ function buildDxfString(allShapes) {
         }
 
         var name = blockName(emittedBlocks.length);
-        emittedBlocks.push(name);
+        emittedBlocks.push(
+            {
+            blockName: name,
+            layerName: shape.layerName || "0"
+            }
+        );
+        
 
         add("0",  "BLOCK");
         add("8",  "0");
@@ -127,6 +309,7 @@ function buildDxfString(allShapes) {
         add("30", "0.0");
 
         addSideWallsForShape(shape);
+        addEarClippedCapsForShape(shape);
 
         add("0", "ENDBLK");
     }
@@ -140,9 +323,13 @@ function buildDxfString(allShapes) {
     add("2", "ENTITIES");
 
     for (var j = 0; j < emittedBlocks.length; j++) {
+        
+        blockInfo = emittedBlocks[j];
+        
         add("0",  "INSERT");
-        add("8",  "LAYER");
-        add("2",  emittedBlocks[j]);
+        add("8",  blockInfo.layerName ||"0");
+        add("2",  blockInfo.blockName);
+
         add("10", "0.0");
         add("20", "0.0");
         add("30", "0.0");

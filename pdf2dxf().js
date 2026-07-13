@@ -47,13 +47,13 @@ function pdf2dxf()
 
 			var a = annots[i];
 
-			if (a.subject === "CONTROL") continue;
+			if (a.author === "CONTROL") continue;
 
 			// parse z values
-			var zData = parseZValues(a.subject, this);
+			var zData = parseZValues(a.author, this);
 			if (!zData.valid)
 			{
-				console.println("Invalid z values for annotation " + i + ": " + a.subject);
+				console.println("Invalid z values for annotation " + i + ": " + a.author);
 				continue;
 			}
 
@@ -104,6 +104,7 @@ function pdf2dxf()
                     pts: worldPts,
                     zBase: zBase,
                     zHeight: zHeight,
+					layerName: a.subject,
                     isFlat: isFlat,
                     colour: strokeColor,
                     page: p
