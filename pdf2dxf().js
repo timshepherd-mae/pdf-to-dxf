@@ -101,10 +101,14 @@ function pdf2dxf()
                 var shape = 
                 {
                     type: a.type,
+
+					subject: a.subject,
+					author: a.author,
+
                     pts: worldPts,
                     zBase: zBase,
                     zHeight: zHeight,
-					layerName: a.subject,
+					
                     isFlat: isFlat,
                     colour: strokeColor,
                     page: p
