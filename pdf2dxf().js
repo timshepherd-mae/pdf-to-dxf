@@ -132,18 +132,18 @@ function pdf2dxf()
 
 	var dxfString = buildDxfString(allShapes);
 
-	/*
-	var errors = validateDxf(dxfString.split(/\r\n/));
- 	if (errors.length > 0) 
-	{ 
-		console.println("DXF VALIDATION FAILED:"); 
-		errors.forEach(function(e) { console.println(e); });
-	} 
-	else 
-	{ 
-		console.println("DXF VALID ✅"); 
+	
+	try
+	{
+		this.removeDataObject("model.dxf");
+		console.println("Removed existing model.dxf");
 	}
-		*/
+	catch (e)
+	{
+		// ignore
+	}
+
+	
 	try 
 	{ 
 		if (this.createDataObject)

@@ -1,13 +1,13 @@
-function parseZValues(subject, doc) {
+function parseZValues(author, doc) {
 
-    if (!subject) {
+    if (!author) {
         return { zBase: 0, zHeight: 0, valid: false };
     }
 
-    var parts = subject.split(":");
+    var parts = author.split(":");
 
     if (parts.length !== 2) {
-        console.println("Invalid subject format: " + subject);
+        console.println("Invalid author format: " + author);
         return { zBase: 0, zHeight: 0, valid: false };
     }
 
@@ -18,34 +18,78 @@ function parseZValues(subject, doc) {
     var zHeight = null;
 
     // ✅ Resolve base (first part)
-    if (!isNaN(parseFloat(baseStr))) {
 
+    // direct numeric value
+
+    if (!isNaN(parseFloat(baseStr)))
+    {
         zBase = parseFloat(baseStr);
+    }
+    else
+    {
+        // Match:
+        //
+        // EGL
+        // EGL+0.5
+        // EGL-1
+        // FGL
+        // FGL+2.3
+        // FGL-1.5
 
-    } else if (baseStr === "EGL" || baseStr === "FGL") {
+        var match = baseStr.match(
+            /^(EGL|FGL)([+-]\d+(\.\d+)?)?$/
+        );
 
-        var field = doc.getField(baseStr);
+        if (!match)
+        {
+            console.println("Invalid base value: " + baseStr);
 
-        if (!field) {
-            console.println("Missing form field: " + baseStr);
-            return { zBase: 0, zHeight: 0, valid: false };
+            return {
+                zBase: 0,
+                zHeight: 0,
+                valid: false
+            };
         }
 
-        var val = parseFloat(field.value);
+        var refName = match[1];
+        var offset = match[2] ?
+            parseFloat(match[2]) :
+            0;
 
-        if (isNaN(val)) {
-            console.println("Invalid value in field: " + baseStr);
-            return { zBase: 0, zHeight: 0, valid: false };
+        var field = doc.getField(refName);
+
+        if (!field)
+        {
+            console.println(
+                "Missing form field: " + refName
+            );
+
+            return {
+                zBase: 0,
+                zHeight: 0,
+                valid: false
+            };
         }
 
-        zBase = val;
+        var refValue = parseFloat(field.value);
 
-    } else {
+        if (isNaN(refValue))
+        {
+            console.println(
+                "Invalid value in field: " + refName
+            );
 
-        console.println("Invalid base value: " + baseStr);
-        return { zBase: 0, zHeight: 0, valid: false };
+            return {
+                zBase: 0,
+                zHeight: 0,
+                valid: false
+            };
+        }
+
+        zBase = refValue + offset;
     }
 
+    
     // ✅ Resolve height (second part)
     if (!isNaN(parseFloat(heightStr))) {
 
