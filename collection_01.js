@@ -1,24 +1,55 @@
 function pdf2dxf()
 {
 
-	var allShapes = [];
+	function pad2(n) {
+	return n < 10 ? "0" + n : String(n);
+	}
 
-	console.clear();
-	console.println("Running testPolygons...");
+    try
+    {
+        var dataObjects = this.dataObjects;
 
+        if (dataObjects && dataObjects.length)
+        {
+            for (var i = dataObjects.length - 1; i >= 0; i--)
+            {
+                try
+                {
+                    var name = dataObjects[i].name;
+
+                    this.removeDataObject(name);
+
+                    console.println(
+                        "Removed attachment: " +
+                        name
+                    );
+                }
+                catch (ex)
+                {
+                    console.println(
+                        "Failed to remove attachment: " +
+                        dataObjects[i].name
+                    );
+                }
+            }
+        }
+    }
+    catch (e)
+    {
+        console.println(
+            "Attachment cleanup failed: " + e
+        );
+    }
+
+
+	
 	var cPts = getControlLinePoints.call(this);
 	var wPts = getControlWorldPoints.call(this);
 
-
-    // DEBUG: print control points
-    console.println("CONTROL PDF POINTS:");
-    console.println(JSON.stringify(cPts));
-
-    console.println("CONTROL WORLD POINTS:");
-    console.println(JSON.stringify(wPts));
-    // DEBUG: end
-
-
+	var preCollectionField = this.getField("preCollection");
+	var prePageField = this.getField("prePage");
+	var preCollection = preCollectionField ? String(preCollectionField.value).trim() : "";
+	var prePage = prePageField ? String(prePageField.value).trim() : "";
 
 	if (!cPts || !wPts)
 	{
@@ -37,30 +68,13 @@ function pdf2dxf()
 	}
 
 
-    // DEBUG: test transform on control points
-    for (var i = 0; i < 3; i++)
-    {
-        var test = affineTransform([cPts[i]], T)[0];
-
-        console.println(
-            "Expected: (" +
-            wPts[i].x + "," + wPts[i].y +
-            ") Got: (" +
-            test.x + "," + test.y +
-            ")"
-        );
-    }
-    // DEBUG: end
-
-
-	console.println("Transform computed:");
-	console.println(JSON.stringify(T));
-
 	var totalPages = this.numPages;
 	console.println("Total pages: " + totalPages);
 
 	for (var p = 1; p < totalPages; p++)
 	{
+		var allShapes = [];
+
 		console.println("=== Page " + p + " ===");
 
 
@@ -149,6 +163,8 @@ function pdf2dxf()
                     pts: worldPts,
                     zBase: zBase,
                     zHeight: zHeight,
+
+					guid: a.name,
 					
                     isFlat: isFlat,
                     colour: fillColor,
@@ -169,55 +185,47 @@ function pdf2dxf()
 
 		}
 
-	}
+		var dxfString = buildDxfString(allShapes, preCollection, prePage, p);
 
-	var dxfString = buildDxfString(allShapes);
+		var filename = preCollection + "-" + prePage + "-" + pad2(p) + ".dxf";
+
+		
+		try 
+		{ 
+			if (this.createDataObject)
+			{
+				this.createDataObject(
+					{ 
+						cName: filename, 
+						cValue: dxfString 
+					}
+				); 
+			}
+			else if (this.addDataObject)
+			{
+				this.addDataObject(
+					{ 
+						cName: filename,
+						cValue: dxfString 
+					}
+				); 
+			}
+			else
+			{
+				throw "No attachment API available";
+			}
+
+			console.println("DXF attached: " + filename);
+		} 
+		catch (e) 
+		{ 
+			console.println("DXF attach failed: " + e); 
+		}
+
+
+	}
 
 	
-	try
-	{
-		this.removeDataObject("model.dxf");
-		console.println("Removed existing model.dxf");
-	}
-	catch (e)
-	{
-		// ignore
-	}
-
-	
-	try 
-	{ 
-		if (this.createDataObject)
-		{
-			this.createDataObject(
-				{ 
-					cName: "model.dxf", 
-					cValue: dxfString 
-				}
-			); 
-		}
-		else if (this.addDataObject)
-		{
-			this.addDataObject(
-				{ 
-					cName: "model.dxf",
-					cValue: dxfString 
-				}
-			); 
-		}
-		else
-		{
-			throw "No attachment API available";
-		}
-
-		console.println("DXF attached: model.dxf");
-	} 
-	catch (e) 
-	{ 
-		console.println("DXF attach failed: " + e); 
-	}
-
-	return dxfString;
 
 }
 
@@ -531,10 +539,15 @@ function parseZValuesInternal(author, doc) {
 }
 
 
-function buildDxfString(allShapes) {
+function buildDxfString(allShapes, preCollection, prePage, pg) {
     // Simplified AutoCAD R12-style DXF writer.
     // Current scope: side-wall 3DFACEs only.
     // Deferred: top and bottom triangulation by ear-cutting.
+
+    function pad2(n) {
+	return n < 10 ? "0" + n : String(n);
+	}
+
 
     var lines = [];
 
@@ -588,7 +601,7 @@ function buildDxfString(allShapes) {
     function blockName(index) {
         // BLOCK-01, BLOCK-02, ... to match the style of minimum_3F.dxf.txt.
         var n = index + 1;
-        return "BLOCK-" + (n < 10 ? "0" + n : String(n));
+        return preCollection + "-" + prePage + "-" + pad2(pg) + "-BLOCK-" + pad2(n);
     }
 
 
@@ -1061,6 +1074,7 @@ function buildDxfString(allShapes) {
 
     return lines.join("\n");
 }
+
 
 
 pdf2dxf();

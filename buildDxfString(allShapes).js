@@ -1,7 +1,12 @@
-function buildDxfString(allShapes) {
+function buildDxfString(allShapes, preCollection, prePage, pg) {
     // Simplified AutoCAD R12-style DXF writer.
     // Current scope: side-wall 3DFACEs only.
     // Deferred: top and bottom triangulation by ear-cutting.
+
+    function pad2(n) {
+	return n < 10 ? "0" + n : String(n);
+	}
+
 
     var lines = [];
 
@@ -55,7 +60,7 @@ function buildDxfString(allShapes) {
     function blockName(index) {
         // BLOCK-01, BLOCK-02, ... to match the style of minimum_3F.dxf.txt.
         var n = index + 1;
-        return "BLOCK-" + (n < 10 ? "0" + n : String(n));
+        return preCollection + "-" + prePage + "-" + pad2(pg) + "-BLOCK-" + pad2(n);
     }
 
 
