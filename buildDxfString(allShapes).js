@@ -90,6 +90,57 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
         add("13", fmt(p4.x)); add("23", fmt(p4.y)); add("33", fmt(p4.z));
     }
 
+    function addDefAtt(tag, visible)
+    {
+        add("0", "ATTDEF");
+
+        add("8", "0");
+
+        add("10", "0.0");
+        add("20", "0.0");
+        add("30", "0.0");
+
+        add("40", "1.0");
+
+        // default value
+
+        add("1", "");
+
+        // tag
+
+        add("2", tag);
+
+        // prompt
+
+        add("3", tag);
+
+        add("70", visible ? "0" : "1");
+    }
+    
+    function addRefAtt(tag, value, visible)
+    {
+        add("0", "ATTRIB");
+
+        add("8", "0");
+
+        add("10", "0.0");
+        add("20", "0.0");
+        add("30", "0.0");
+
+        add("40", "1.0");
+
+        add("1",
+            value == null
+                ? ""
+                : String(value)
+        );
+
+        add("2", tag);
+
+        add("70", visible ? "0" : "1");
+    }
+    
+
 
     function triangulatePolygonEarClipping(pts) {
         var triangles = [];
@@ -487,6 +538,8 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
         add("20", "0.0");
         add("30", "0.0");
 
+        addDefAtt("GUID", true);
+
         addSideWallsForShape(shape);
         addEarClippedCapsForShape(shape);
 
@@ -523,9 +576,20 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
 
         add("2", blockInfo.blockName);
 
+        add("66", "1");
+
         add("10", "0.0");
         add("20", "0.0");
         add("30", "0.0");
+
+        addRefAtt(
+            "GUID",
+            blockInfo.shape.guid, 
+            false
+        );
+
+        add("0", "SEQEND");
+
     }
 
     add("0", "ENDSEC");
