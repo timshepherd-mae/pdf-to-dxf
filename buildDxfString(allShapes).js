@@ -528,3 +528,4 @@ function buildDxfString(allShapes) {
 
     return lines.join("\n");
 }
+

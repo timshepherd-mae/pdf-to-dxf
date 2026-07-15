@@ -8,6 +8,18 @@ function pdf2dxf()
 
 	var cPts = getControlLinePoints.call(this);
 	var wPts = getControlWorldPoints.call(this);
+
+
+    // DEBUG: print control points
+    console.println("CONTROL PDF POINTS:");
+    console.println(JSON.stringify(cPts));
+
+    console.println("CONTROL WORLD POINTS:");
+    console.println(JSON.stringify(wPts));
+    // DEBUG: end
+
+
+
 	if (!cPts || !wPts)
 	{
 		console.println("Missing control data");
@@ -15,11 +27,31 @@ function pdf2dxf()
 	}	
 
 	var T = solveAffineTransform(cPts, wPts);
+
+
+
 	if (!T)
 	{
 		console.println("Failed to solve affine transform");
 		return;
 	}
+
+
+    // DEBUG: test transform on control points
+    for (var i = 0; i < 3; i++)
+    {
+        var test = affineTransform([cPts[i]], T)[0];
+
+        console.println(
+            "Expected: (" +
+            wPts[i].x + "," + wPts[i].y +
+            ") Got: (" +
+            test.x + "," + test.y +
+            ")"
+        );
+    }
+    // DEBUG: end
+
 
 	console.println("Transform computed:");
 	console.println(JSON.stringify(T));
@@ -27,7 +59,7 @@ function pdf2dxf()
 	var totalPages = this.numPages;
 	console.println("Total pages: " + totalPages);
 
-	for (var p = 0; p < totalPages; p++)
+	for (var p = 1; p < totalPages; p++)
 	{
 		console.println("=== Page " + p + " ===");
 
@@ -47,7 +79,7 @@ function pdf2dxf()
 
 			var a = annots[i];
 
-			if (a.author === "CONTROL") continue;
+			if (a.subject === "CONTROL") continue;
 
 			// parse z values
 			var zData = parseZValues(a.author, this);
@@ -65,9 +97,9 @@ function pdf2dxf()
 
 
 			// get fill colour value
-			var strokeColor = a.strokeColor;
+			var fillColor = a.fillColor;
 
-			console.println("colour: " + strokeColor );
+			console.println("colour: " + fillColor );
 
 
 			console.println("Type: " + a.type);
@@ -85,6 +117,15 @@ function pdf2dxf()
 					console.println("No vertices!");
 					continue;
 				}
+
+
+                // DEBUG: print raw vertices
+                console.println(
+                    "RAW VERTICES = " +
+                    JSON.stringify(verts)
+                );
+                // DEBUG: end
+
 
 				// get local points from verts
 				var pts = normaliseVertices(verts);
@@ -110,7 +151,7 @@ function pdf2dxf()
                     zHeight: zHeight,
 					
                     isFlat: isFlat,
-                    colour: strokeColor,
+                    colour: fillColor,
                     page: p
                 }
 

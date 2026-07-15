@@ -8,6 +8,18 @@ function pdf2dxf()
 
 	var cPts = getControlLinePoints.call(this);
 	var wPts = getControlWorldPoints.call(this);
+
+
+    // DEBUG: print control points
+    console.println("CONTROL PDF POINTS:");
+    console.println(JSON.stringify(cPts));
+
+    console.println("CONTROL WORLD POINTS:");
+    console.println(JSON.stringify(wPts));
+    // DEBUG: end
+
+
+
 	if (!cPts || !wPts)
 	{
 		console.println("Missing control data");
@@ -15,11 +27,31 @@ function pdf2dxf()
 	}	
 
 	var T = solveAffineTransform(cPts, wPts);
+
+
+
 	if (!T)
 	{
 		console.println("Failed to solve affine transform");
 		return;
 	}
+
+
+    // DEBUG: test transform on control points
+    for (var i = 0; i < 3; i++)
+    {
+        var test = affineTransform([cPts[i]], T)[0];
+
+        console.println(
+            "Expected: (" +
+            wPts[i].x + "," + wPts[i].y +
+            ") Got: (" +
+            test.x + "," + test.y +
+            ")"
+        );
+    }
+    // DEBUG: end
+
 
 	console.println("Transform computed:");
 	console.println(JSON.stringify(T));
@@ -27,7 +59,7 @@ function pdf2dxf()
 	var totalPages = this.numPages;
 	console.println("Total pages: " + totalPages);
 
-	for (var p = 0; p < totalPages; p++)
+	for (var p = 1; p < totalPages; p++)
 	{
 		console.println("=== Page " + p + " ===");
 
@@ -47,7 +79,7 @@ function pdf2dxf()
 
 			var a = annots[i];
 
-			if (a.author === "CONTROL") continue;
+			if (a.subject === "CONTROL") continue;
 
 			// parse z values
 			var zData = parseZValues(a.author, this);
@@ -65,9 +97,9 @@ function pdf2dxf()
 
 
 			// get fill colour value
-			var strokeColor = a.strokeColor;
+			var fillColor = a.fillColor;
 
-			console.println("colour: " + strokeColor );
+			console.println("colour: " + fillColor );
 
 
 			console.println("Type: " + a.type);
@@ -85,6 +117,15 @@ function pdf2dxf()
 					console.println("No vertices!");
 					continue;
 				}
+
+
+                // DEBUG: print raw vertices
+                console.println(
+                    "RAW VERTICES = " +
+                    JSON.stringify(verts)
+                );
+                // DEBUG: end
+
 
 				// get local points from verts
 				var pts = normaliseVertices(verts);
@@ -110,7 +151,7 @@ function pdf2dxf()
                     zHeight: zHeight,
 					
                     isFlat: isFlat,
-                    colour: strokeColor,
+                    colour: fillColor,
                     page: p
                 }
 
@@ -330,13 +371,61 @@ function affineTransform(pts, T) {
 }
 
 
-function parseZValues(author, doc) {
+function parseZValues(author, doc)
+{
+    var result = parseZValuesInternal(author, doc);
+
+    if (result.valid)
+    {
+        return result;
+    }
+
+    // --------------------------------
+    // fallback to zDefault
+    // --------------------------------
+
+    var defaultField = doc.getField("zDefault");
+
+    if (!defaultField)
+    {
+        console.println(
+            "zDefault field not found"
+        );
+
+        return result;
+    }
+
+    var defaultText =
+        String(defaultField.value).trim();
+
+    if (!defaultText)
+    {
+        console.println(
+            "zDefault is blank"
+        );
+
+        return result;
+    }
+
+    console.println(
+        "Using zDefault: " +
+        defaultText
+    );
+
+    return parseZValuesInternal(
+        defaultText,
+        doc
+    );
+}
+
+
+function parseZValuesInternal(author, doc) {
 
     if (!author) {
         return { zBase: 0, zHeight: 0, valid: false };
     }
 
-    var parts = author.split(":");
+    var parts = author.split("/");
 
     if (parts.length !== 2) {
         console.println("Invalid author format: " + author);
@@ -971,86 +1060,6 @@ function buildDxfString(allShapes) {
     add("0", "EOF");
 
     return lines.join("\n");
-}
-
-
-function validateDxf(lines) {
-
-    var errors = [];
-    var handles = {};
-
-    // --- HANDLE CHECK (PAIR SAFE) ---
-    for (var i = 0; i < lines.length; i += 2) {
-
-        var code = (lines[i] || "").trim();
-        var value = (lines[i + 1] || "").trim();
-        
-        if (code === "5") {
-
-            if (value === "0") {
-                errors.push("INVALID HANDLE 0 at line " + (i + 2));
-            }
-
-            if (handles[value]) {
-                errors.push("DUPLICATE HANDLE " + value + " at line " + (i + 2));
-            }
-
-            handles[value] = true;
-        }
-    }
-
-    // --- BASIC STRUCTURE CHECKS ---
-    var text = lines.join("");
-
-    function mustContain(name) {
-        if (text.indexOf(name) === -1) {
-            errors.push("Missing section: " + name);
-        }
-    }
-
-    mustContain("SECTION");
-    mustContain("HEADER");
-    mustContain("TABLES");
-    mustContain("BLOCKS");
-    mustContain("ENTITIES");
-
-    // --- APPID TABLE CHECK ---
-    if (text.indexOf("APPID") === -1) {
-        errors.push("Missing APPID table");
-    }
-
-    // --- BLOCK_RECORD COUNT CHECK ---
-    var blockRecordCount = 0;
-
-    for (var i = 0; i < lines.length; i++) {
-        if (lines[i].trim() === "BLOCK_RECORD") {
-            blockRecordCount++;
-        }
-    }
-
-    // subtract TABLE header occurrence
-    blockRecordCount -= 1;
-
-    for (var i = 0; i < lines.length; i++) {
-
-        if (
-            lines[i].trim() === "BLOCK_RECORD" &&
-            (lines[i - 2] || "").trim() === "TABLE"
-        ) {
-            var declared = parseInt((lines[i + 2] || "").trim(), 10);;
-
-            if (declared !== blockRecordCount) {
-                errors.push(
-                    "BLOCK_RECORD count mismatch: declared=" +
-                    declared + " actual=" + blockRecordCount
-                );
-            }
-
-            break;
-        }
-    }
-
-    return errors;
 }
 
 

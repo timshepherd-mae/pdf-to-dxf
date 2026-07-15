@@ -1,10 +1,10 @@
-function parseZValues(author, doc) {
+function parseZValuesInternal(author, doc) {
 
     if (!author) {
         return { zBase: 0, zHeight: 0, valid: false };
     }
 
-    var parts = author.split(":");
+    var parts = author.split("/");
 
     if (parts.length !== 2) {
         console.println("Invalid author format: " + author);
@@ -108,3 +108,4 @@ function parseZValues(author, doc) {
         isFlat: (zHeight === 0)
     };
 }
+

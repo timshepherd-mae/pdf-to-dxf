@@ -12,3 +12,4 @@ function getControlWorldPoints() {
         { x: getVal.call(this, "world_cx"), y: getVal.call(this, "world_cy") }
     ];
 }
+
