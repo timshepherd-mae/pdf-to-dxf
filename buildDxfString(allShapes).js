@@ -3,12 +3,13 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
     // Current scope: side-wall 3DFACEs only.
     // Deferred: top and bottom triangulation by ear-cutting.
 
+    var lines = [];
+
+
     function pad2(n) {
 	return n < 10 ? "0" + n : String(n);
 	}
 
-
-    var lines = [];
 
     function add() {
         for (var i = 0; i < arguments.length; i++) {
@@ -517,9 +518,21 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
     for (var i = 0; i < allShapes.length; i++) {
         var shape = allShapes[i];
 
-        if (!shape || shape.type !== "Polygon" || !shape.pts || shape.pts.length < 3) {
+        // if (!shape || shape.type !== "Polygon" || !shape.pts || shape.pts.length < 3) {
+        //     continue;
+        // }
+
+        if (!shape || !shape.pts || shape.pts.length < 3) {
             continue;
         }
+
+    
+        console.println(
+            "DXF BLOCK: " +
+            shape.type +
+            " : " +
+            (shape.subject || "")
+        );
 
         var name = blockName(emittedBlocks.length);
         emittedBlocks.push(
@@ -558,6 +571,15 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
     for (var j = 0; j < emittedBlocks.length; j++)
     {
         var blockInfo = emittedBlocks[j];
+
+        
+        console.println(
+            "DXF INSERT: " +
+            blockInfo.shape.type +
+            " : " +
+            blockInfo.blockName
+        );
+
 
         add("0", "INSERT");
 

@@ -5,6 +5,57 @@ function pdf2dxf()
 	return n < 10 ? "0" + n : String(n);
 	}
 
+
+    function isValidMarkup(a)
+    {
+        if (!a)
+        {
+            return false;
+        }
+
+        if (a.subject === "CONTROL")
+        {
+            return false;
+        }
+
+        if (a.author === "AutoCAD SHX Text")
+        {
+            return false;
+        }
+
+        if (validTypes.indexOf(a.type) < 0)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+
+	function getMarkupVertices(a)
+	{
+		if (a.vertices)
+		{
+			return a.vertices;
+		}
+
+		if (a.type === "Square" && a.rect)
+		{
+			var r = a.rect;
+
+			return [
+				[r[0], r[1]],
+				[r[2], r[1]],
+				[r[2], r[3]],
+				[r[0], r[3]]
+			];
+		}
+
+		return null;
+	}
+
+
+
     try
     {
         var dataObjects = this.dataObjects;
@@ -41,7 +92,11 @@ function pdf2dxf()
         );
     }
 
-
+	var validTypes = 
+	[
+		"Polygon",
+		"Square"
+	];
 	
 	var cPts = getControlLinePoints.call(this);
 	var wPts = getControlWorldPoints.call(this);
@@ -93,7 +148,28 @@ function pdf2dxf()
 
 			var a = annots[i];
 
-			if (a.subject === "CONTROL") continue;
+
+			console.println(
+				"Annotation " + i +
+				" type=" + a.type +
+				" subject=" + a.subject +
+				" author=" + a.author
+			);
+
+
+			if (!isValidMarkup(a))
+			{
+				console.println(
+					"Rejected markup: " +
+					a.type +
+					" | subject=" +
+					a.subject +
+					" | author=" +
+					a.author
+				);
+
+				continue;
+			}
 
 			// parse z values
 			var zData = parseZValues(a.author, this);
@@ -118,14 +194,15 @@ function pdf2dxf()
 
 			console.println("Type: " + a.type);
 
-			if (a.type === "Polygon")
+			if (a.type === "Polygon" || a.type === "Square")
 			{
 
+				
 				console.println("---- " + a.type + " Found ----");
 
-				var verts = a.vertices;
+				var verts = getMarkupVertices(a);
 
-			
+
 				if (!verts)
 				{
 					console.println("No vertices!");
@@ -186,6 +263,19 @@ function pdf2dxf()
 		}
 
 		var dxfString = buildDxfString(allShapes, preCollection, prePage, p);
+
+		if (allShapes.length === 0)
+		{
+			console.println(
+				"No valid markups on page " +
+				p +
+				". Skipping DXF generation."
+			);
+
+			continue;
+		}
+
+
 
 		var filename = preCollection + "-" + prePage + "-" + pad2(p) + ".dxf";
 
@@ -544,12 +634,13 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
     // Current scope: side-wall 3DFACEs only.
     // Deferred: top and bottom triangulation by ear-cutting.
 
+    var lines = [];
+
+
     function pad2(n) {
 	return n < 10 ? "0" + n : String(n);
 	}
 
-
-    var lines = [];
 
     function add() {
         for (var i = 0; i < arguments.length; i++) {
@@ -1058,9 +1149,21 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
     for (var i = 0; i < allShapes.length; i++) {
         var shape = allShapes[i];
 
-        if (!shape || shape.type !== "Polygon" || !shape.pts || shape.pts.length < 3) {
+        // if (!shape || shape.type !== "Polygon" || !shape.pts || shape.pts.length < 3) {
+        //     continue;
+        // }
+
+        if (!shape || !shape.pts || shape.pts.length < 3) {
             continue;
         }
+
+    
+        console.println(
+            "DXF BLOCK: " +
+            shape.type +
+            " : " +
+            (shape.subject || "")
+        );
 
         var name = blockName(emittedBlocks.length);
         emittedBlocks.push(
@@ -1100,6 +1203,15 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
     {
         var blockInfo = emittedBlocks[j];
 
+        
+        console.println(
+            "DXF INSERT: " +
+            blockInfo.shape.type +
+            " : " +
+            blockInfo.blockName
+        );
+
+
         add("0", "INSERT");
 
         add("8",
@@ -1138,6 +1250,7 @@ function buildDxfString(allShapes, preCollection, prePage, pg) {
 
     return lines.join("\n");
 }
+
 
 
 
